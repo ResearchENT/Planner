@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>پلنر و داشبورد هوشمند (فایربیس)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/vazirmatn@5.0.16/index.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<!-- ========== 1) SDK فایربیس ========== -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+<style>
+:root[data-theme="dark"]{
+  --bg:#0b0f1a; --panel:#121829; --panel2:#161e33; --border:#232d4a;
+  --text:#e8ecf7; --muted:#8b96b8; --accent:#6c8cff; --accent2:#38e1c6;
+  --warn:#ffb454; --danger:#ff6b81; --good:#4ade80;
+  --hm0:#182039;--hm1:#1e3a5f;--hm2:#2b6cb0;--hm3:#4f9cf7;--hm4:#38e1c6;
+  --shadow:0 10px 30px rgba(0,0,0,.35); --input:#0e1526;
+}
+:root[data-theme="light"]{
+  --bg:#eef1f9; --panel:#ffffff; --panel2:#f4f6fd; --border:#dde3f0;
+  --text:#182040; --muted:#67718f; --accent:#4f6ef7; --accent2:#0fbfa4;
+  --warn:#e8930c; --danger:#e35d74; --good:#16a34a;
+  --hm0:#e8edf7;--hm1:#bcd4f5;--hm2:#7ea8ee;--hm3:#4f7ce0;--hm4:#16b59c;
+  --shadow:0 10px 30px rgba(30,50,110,.08); --input:#f0f3fb;
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Vazirmatn',sans-serif}
+body{background:radial-gradient(1200px 600px at 80% -10%,rgba(108,140,255,.14),transparent 55%),var(--bg);color:var(--text);min-height:100vh;transition:background .3s,color .3s}
+.container{max-width:1400px;margin:0 auto;padding:22px}
+
+/* ---------- Login Screen ---------- */
+.login-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:100}
+.login-box{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:32px;width:min(420px,92vw);box-shadow:var(--shadow)}
+.login-box h2{text-align:center;margin-bottom:8px;font-size:22px}
+.login-box .sub{text-align:center;color:var(--muted);font-size:13px;margin-bottom:24px}
+.login-box input{width:100%;margin-bottom:12px}
+.login-box .btn{width:100%;margin-top:8px}
+.login-box .switch{text-align:center;margin-top:16px;font-size:12px;color:var(--muted)}
+.login-box .switch a{color:var(--accent);cursor:pointer;text-decoration:underline}
+.login-err{color:var(--danger);font-size:12px;text-align:center;margin-top:8px;min-height:18px}
+
+header{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;margin-bottom:22px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:var(--shadow)}
+.brand h1{font-size:19px;font-weight:800}
+.brand p{font-size:11px;color:var(--muted)}
+.tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:5px}
+.tab{border:none;background:transparent;color:var(--muted);padding:9px 20px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;transition:.25s}
+.tab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.icon-btn{background:var(--panel);border:1px solid var(--border);color:var(--text);width:42px;height:42px;border-radius:12px;cursor:pointer;font-size:17px;transition:.25s}
+.icon-btn:hover{transform:translateY(-2px);border-color:var(--accent)}
+.user-chip{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border);padding:6px 12px;border-radius:12px;font-size:12px}
+.user-chip .av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:12px}
+
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.c8{grid-column:span 8}.c6{grid-column:span 6}.c4{grid-column:span 4}.c12{grid-column:span 12}
+@media(max-width:1000px){.c8,.c6,.c4{grid-column:span 12}}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:20px;box-shadow:var(--shadow)}
+.card h3{font-size:15px;margin-bottom:3px}
+.card .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+.chart-wrap{position:relative;height:280px}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px;position:relative;overflow:hidden;transition:.3s}
+.kpi:hover{transform:translateY(-3px)}
+.kpi .glow{position:absolute;width:80px;height:80px;border-radius:50%;filter:blur(40px);opacity:.3;top:-28px;left:-28px}
+.kpi .label{color:var(--muted);font-size:11px;margin-bottom:7px}
+.kpi .value{font-size:24px;font-weight:800}
+.kpi .hint{font-size:11px;color:var(--muted);margin-top:5px}
+.mini-bar{height:6px;background:var(--panel2);border-radius:6px;margin-top:10px;overflow:hidden}
+.mini-bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width 1s ease}
+
+input,select,textarea{background:var(--input);border:1px solid var(--border);color:var(--text);border-radius:11px;padding:11px 14px;font-size:13px;outline:none;transition:.2s;font-family:inherit}
+input:focus,select:focus{border-color:var(--accent)}
+.form-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.form-row input[type=text]{flex:2;min-width:200px}
+.form-row input[type=date],.form-row select{flex:1;min-width:120px}
+.btn{border:none;border-radius:11px;padding:11px 20px;font-size:13px;cursor:pointer;font-weight:700;transition:.25s;font-family:inherit}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.btn.primary:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(108,140,255,.4)}
+.btn.ghost{background:var(--panel2);color:var(--muted);border:1px solid var(--border)}
+.btn.ghost:hover{color:var(--danger);border-color:var(--danger)}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
+.toolbar select{padding:9px 12px;font-size:12px}
+.task{display:flex;gap:14px;align-items:center;background:var(--panel2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px;transition:.25s;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.task:hover{border-color:var(--accent)}
+.task.done{opacity:.55}
+.task.done .t-title{text-decoration:line-through}
+.task.overdue{border-right:4px solid var(--danger)}
+.check{width:26px;height:26px;min-width:26px;border-radius:9px;border:2px solid var(--border);background:transparent;cursor:pointer;color:#fff;font-size:14px;transition:.2s;display:flex;align-items:center;justify-content:center}
+.check.on{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent}
+.t-main{flex:1;min-width:0}
+.t-title{font-size:14px;font-weight:700;margin-bottom:6px}
+.t-meta{display:flex;flex-wrap:wrap;gap:6px}
+.badge{font-size:10px;padding:3px 10px;border-radius:20px;background:var(--panel);border:1px solid var(--border);color:var(--muted)}
+.badge.p3{color:var(--danger);border-color:var(--danger)} .badge.p2{color:var(--warn);border-color:var(--warn)} .badge.p1{color:var(--good);border-color:var(--good)}
+.badge.late{color:var(--danger);border-color:var(--danger);font-weight:700}
+.t-actions{display:flex;gap:6px}
+.t-actions button{background:transparent;border:1px solid var(--border);border-radius:9px;width:32px;height:32px;cursor:pointer;font-size:13px;transition:.2s}
+.t-actions button:hover{border-color:var(--accent);transform:translateY(-2px)}
+.empty{text-align:center;padding:50px 20px;color:var(--muted)}
+.empty .big{font-size:44px;margin-bottom:12px}
+
+.goal-ring{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.ring-box{position:relative;width:135px;height:135px}
+.ring-box svg{transform:rotate(-90deg)}
+.ring-val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring-val b{font-size:24px}.ring-val small{color:var(--muted);font-size:10px}
+.goal-info{flex:1;min-width:170px}
+.goal-info .row{display:flex;justify-content:space-between;font-size:12px;padding:8px 0;border-bottom:1px dashed var(--border);color:var(--muted)}
+.goal-info .row b{color:var(--text)}
+
+.heatmap{display:grid;grid-template-columns:repeat(26,1fr);gap:4px}
+.hm-cell{aspect-ratio:1;border-radius:4px;cursor:pointer;transition:.15s}
+.hm-cell:hover{transform:scale(1.35)}
+.hm-legend{display:flex;align-items:center;gap:6px;margin-top:14px;font-size:11px;color:var(--muted)}
+.hm-legend .box{width:12px;height:12px;border-radius:3px;display:inline-block}
+
+.insights{display:flex;flex-direction:column;gap:11px}
+.insight{display:flex;gap:12px;background:var(--panel2);border:1px solid var(--border);border-right:4px solid var(--accent);border-radius:14px;padding:13px 14px;animation:slideIn .45s ease both}
+.insight:nth-child(2){animation-delay:.07s;border-right-color:var(--accent2)}
+.insight:nth-child(3){animation-delay:.14s;border-right-color:var(--warn)}
+.insight:nth-child(4){animation-delay:.21s;border-right-color:var(--danger)}
+.insight:nth-child(5){animation-delay:.28s;border-right-color:var(--good)}
+.insight:nth-child(6){animation-delay:.35s;border-right-color:#b48cff}
+@keyframes slideIn{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+.insight .icon{font-size:19px;line-height:1.2}
+.insight b{font-size:13px;display:block;margin-bottom:3px}
+.insight p{font-size:11.5px;color:var(--muted);line-height:1.9}
+.tag{display:inline-block;font-size:9.5px;padding:2px 9px;border-radius:20px;margin-inline-start:6px;font-weight:400}
+.tag.info{background:rgba(108,140,255,.16);color:var(--accent)} .tag.warn{background:rgba(255,180,84,.16);color:var(--warn)}
+.tag.good{background:rgba(74,222,128,.16);color:var(--good)} .tag.bad{background:rgba(255,107,129,.16);color:var(--danger)}
+
+.modal-back{position:fixed;inset:0;background:rgba(5,10,25,.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:50}
+.modal-back.open{display:flex}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:24px;width:min(480px,92vw);animation:fadeIn .25s ease}
+.modal h3{margin-bottom:16px}
+.modal .form-row{margin-bottom:12px}
+.modal .form-row>*{flex:1}
+.tooltip{position:fixed;background:var(--panel);border:1px solid var(--border);color:var(--text);font-size:11px;padding:6px 10px;border-radius:8px;pointer-events:none;opacity:0;transition:.15s;z-index:99}
+.hidden{display:none!important}
+.loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:200;flex-direction:column;gap:14px}
+.loading .spin{width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sync-badge{font-size:10px;padding:3px 10px;border-radius:20px;background:rgba(74,222,128,.16);color:var(--good);display:inline-flex;align-items:center;gap:5px}
+.sync-badge.offline{background:rgba(255,180,84,.16);color:var(--warn)}
+</style>
+</head>
+<body>
+
+<!-- ========== صفحه لودینگ ========== -->
+<div class="loading" id="loadingScreen">
+  <div class="spin"></div>
+  <div style="color:var(--muted);font-size:13px">در حال اتصال به فایربیس…</div>
+</div>
+
+<!-- ========== صفحه ورود ========== -->
+<div class="login-screen hidden" id="loginScreen">
+  <div class="login-box">
+    <h2>🔐 ورود به حساب</h2>
+    <div class="sub">کارهای شما در فضای ابری امن ذخیره می‌شوند</div>
+    <input type="email" id="loginEmail" placeholder="ایمیل">
+    <input type="password" id="loginPass" placeholder="رمز عبور">
+    <button class="btn primary" onclick="doLogin()">ورود</button>
+    <button class="btn ghost" style="width:100%;margin-top:10px" onclick="doSignup()">ساخت حساب جدید</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- ========== اپلیکیشن اصلی ========== -->
+<div class="container hidden" id="appMain">
+
+  <header>
+    <div class="brand">
+      <div class="logo">📋</div>
+      <div>
+        <h1>پلنر و داشبورد هوشمند</h1>
+        <p>☁️ همگام‌سازی ابری با فایربیس • <span class="sync-badge" id="syncBadge"><span class="live-dot" style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block"></span> آنلاین</span></p>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" id="tabPlanner" onclick="switchView('planner')">📋 پلنر</button>
+      <button class="tab" id="tabDash" onclick="switchView('dash')">📊 داشبورد</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="user-chip" id="userChip"><div class="av" id="userAv">U</div><span id="userEmail">—</span></div>
+      <button class="icon-btn" onclick="toggleTheme()" title="تم">🌙</button>
+      <button class="icon-btn" onclick="doLogout()" title="خروج">🚪</button>
+    </div>
+  </header>
+
+  <!-- ================= پلنر ================= -->
+  <section id="plannerView">
+    <div class="kpi-grid" id="plannerKpis"></div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h3>➕ افزودن کار جدید</h3>
+      <div class="sub">کارهای شما در فایربیس و به‌صورت زنده همگام می‌شوند</div>
+      <div class="form-row">
+        <input type="text" id="newTitle" placeholder="عنوان کار…" onkeydown="if(event.key==='Enter')addTask()">
+        <input type="date" id="newDeadline" title="سررسید">
+        <select id="newPriority" title="اولویت">
+          <option value="1">اولویت: کم</option>
+          <option value="2" selected>اولویت: متوسط</option>
+          <option value="3">اولویت: زیاد</option>
+        </select>
+        <select id="newCategory" title="دسته">
+          <option value="work">💼 کاری</option>
+          <option value="personal">🌿 شخصی</option>
+          <option value="study">📚 درس</option>
+          <option value="other">📌 سایر</option>
+        </select>
+        <button class="btn primary" onclick="addTask()">➕ افزودن</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <select id="fStatus" onchange="renderPlanner()">
+          <option value="all">همه وضعیت‌ها</option><option value="active">فعال</option><option value="done">انجام شده</option>
+        </select>
+        <select id="fPriority" onchange="renderPlanner()">
+          <option value="all">همه اولویت‌ها</option><option value="3">زیاد</option><option value="2">متوسط</option><option value="1">کم</option>
+        </select>
+        <select id="fCategory" onchange="renderPlanner()">
+          <option value="all">همه دسته‌ها</option><option value="work">کاری</option><option value="personal">شخصی</option><option value="study">درس</option><option value="other">سایر</option>
+        </select>
+        <select id="fSort" onchange="renderPlanner()">
+          <option value="newest">مرتب‌سازی: جدیدترین</option><option value="priority">اولویت</option><option value="deadline">سررسید</option>
+        </select>
+        <button class="btn ghost" onclick="clearDone()" style="margin-inline-start:auto">🧹 پاک‌کردن انجام‌شده‌ها</button>
+      </div>
+      <div id="taskList"></div>
+    </div>
+  </section>
+
+  <!-- ================= داشبورد ================= -->
+  <section id="dashView" class="hidden">
+    <div class="kpi-grid" id="dashKpis"></div>
+    <div id="dashEmpty" class="card hidden"><div class="empty"><div class="big">📭</div>هنوز داده‌ای برای تحلیل وجود ندارد!</div></div>
+
+    <div class="grid" id="dashContent">
+      <div class="card c8">
+        <h3>📈 روند تکمیل هفتگی + پیش‌بینی هوشمند</h3>
+        <div class="sub">کارهای انجام‌شده در ۸ هفته اخیر و ۳ هفته پیش‌بینی‌شده</div>
+        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+      </div>
+
+      <div class="card c4">
+        <h3>🎯 پیشرفت کلی و پیش‌بینی اتمام</h3>
+        <div class="sub">بر اساس نرخ تکمیل واقعی شما</div>
+        <div class="goal-ring">
+          <div class="ring-box">
+            <svg width="135" height="135">
+              <circle cx="67" cy="67" r="58" fill="none" stroke="var(--panel2)" stroke-width="12"/>
+              <circle id="ringArc" cx="67" cy="67" r="58" fill="none" stroke="url(#g1)" stroke-width="12" stroke-linecap="round" stroke-dasharray="364" stroke-dashoffset="364" style="transition:stroke-dashoffset 1.3s ease"/>
+              <defs><linearGradient id="g1"><stop offset="0%" stop-color="#6c8cff"/><stop offset="100%" stop-color="#38e1c6"/></linearGradient></defs>
+            </svg>
+            <div class="ring-val"><b id="ringPct">۰٪</b><small>تکمیل شده</small></div>
+          </div>
+          <div class="goal-info" id="goalInfo"></div>
+        </div>
+        <div class="insights" style="margin-top:14px" id="goalInsight"></div>
+      </div>
+
+      <div class="card c4">
+        <h3>🧩 توزیع کارها بر اساس دسته</h3>
+        <div class="sub">سهم هر حوزه از کل کارها</div>
+        <div class="chart-wrap"><canvas id="catChart"></canvas></div>
+      </div>
+
+      <div class="card c4">
+        <h3>🚦 وضعیت اولویت‌ها</h3>
+        <div class="sub">کارهای فعال در برابر انجام‌شده</div>
+        <div class="chart-wrap"><canvas id="priChart"></canvas></div>
+      </div>
+
+      <div class="card c4">
+        <h3>📅 الگوی هفتگی تکمیل</h3>
+        <div class="sub">در هر روز هفته چند کار تمام کرده‌اید</div>
+        <div class="chart-wrap"><canvas id="weekChart"></canvas></div>
+      </div>
+
+      <div class="card c8">
+        <h3>🔥 نقشه حرارتی فعالیت (۱۳ هفته اخیر)</h3>
+        <div class="sub">تعداد کارهای ایجاد/تکمیل‌شده در هر روز</div>
+        <div class="heatmap" id="heatmap"></div>
+        <div class="hm-legend">کم <span class="box" style="background:var(--hm0)"></span><span class="box" style="background:var(--hm1)"></span><span class="box" style="background:var(--hm2)"></span><span class="box" style="background:var(--hm3)"></span><span class="box" style="background:var(--hm4)"></span> زیاد</div>
+      </div>
+
+      <div class="card c4">
+        <h3>🧠 تحلیل‌های هوشمند</h3>
+        <div class="sub">بینش‌های استخراج‌شده از داده‌های واقعی شما</div>
+        <div class="insights" id="insightList"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- مودال ویرایش -->
+<div class="modal-back" id="modalBack" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3>✏️ ویرایش کار</h3>
+    <div class="form-row"><input type="text" id="eTitle" placeholder="عنوان"></div>
+    <div class="form-row">
+      <select id="ePriority"><option value="1">کم</option><option value="2">متوسط</option><option value="3">زیاد</option></select>
+      <select id="eCategory"><option value="work">💼 کاری</option><option value="personal">🌿 شخصی</option><option value="study">📚 درس</option><option value="other">📌 سایر</option></select>
+    </div>
+    <div class="form-row"><input type="date" id="eDeadline"></div>
+    <div class="form-row" style="justify-content:flex-end">
+      <button class="btn ghost" onclick="closeModal()">انصراف</button>
+      <button class="btn primary" onclick="saveEdit()">ذخیره</button>
+    </div>
+  </div>
+</div>
+<div class="tooltip" id="tip"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   🔥🔥🔥  کانفیگ فایربیس - اینجا مقادیر خودت رو بذار  🔥🔥🔥
+   این مقادیر رو از کنسول فایربیس > Project Settings > Your apps بگیر
+   ═══════════════════════════════════════════════════════════ */
+const firebaseConfig = {
+  apiKey: "AIzaSyDjA-5vnw_DzmepG_e1iNtQ7I_iGvZ-W_8",
+  authDomain: "planner-f5d53.firebaseapp.com",
+  databaseURL: "https://planner-f5d53-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "planner-f5d53",
+  storageBucket: "planner-f5d53.firebasestorage.app",
+  messagingSenderId: "141201325170",
+  appId: "1:141201325170:web:790349c7b049af6aeb16eb",
+  measurementId: "G-JCLFX2J08B"
+};
+/* ═══════════════════════════════════════════════════════════ */
+
+// مقداردهی اولیه فایربیس
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/* ================== ابزار ================== */
+const faNum = n => String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+const D = 86400000;
+const CATS = {work:{n:'💼 کاری'},personal:{n:'🌿 شخصی'},study:{n:'📚 درس'},other:{n:'📌 سایر'}};
+const PRIS = {1:'کم',2:'متوسط',3:'زیاد'};
+const DAY_NAMES = ['شنبه','یک‌شنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنج‌شنبه','جمعه'];
+const cssVar = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const todayStart = () => { const d=new Date(); d.setHours(0,0,0,0); return d; };
+const faDate = ts => new Intl.DateTimeFormat('fa-IR',{month:'long',day:'numeric'}).format(new Date(ts));
+
+/* ================== وضعیت اپ ================== */
+let tasks = [];
+let currentUser = null;
+let editId = null;
+let unsubscribe = null; // برای listener زنده فایربیس
+
+/* ================== احراز هویت ================== */
+function showLoading(show){ document.getElementById('loadingScreen').classList.toggle('hidden',!show); }
+function showLogin(){ document.getElementById('loginScreen').classList.remove('hidden'); document.getElementById('appMain').classList.add('hidden'); }
+function showApp(){ document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('appMain').classList.remove('hidden'); }
+
+auth.onAuthStateChanged(user => {
+  showLoading(false);
+  if(user){
+    currentUser = user;
+    document.getElementById('userEmail').textContent = user.email;
+    document.getElementById('userAv').textContent = (user.email||'U').charAt(0).toUpperCase();
+    showApp();
+    subscribeToTasks(); // گوش‌دادن زنده به تغییرات
+  } else {
+    currentUser = null;
+    if(unsubscribe){ unsubscribe(); unsubscribe=null; }
+    tasks = [];
+    showLogin();
+  }
+});
+
+async function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const err = document.getElementById('loginErr');
+  err.textContent='';
+  try{
+    showLoading(true);
+    await auth.signInWithEmailAndPassword(email, pass);
+  }catch(e){ err.textContent = translateError(e.code); showLoading(false); }
+}
+
+async function doSignup(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const err = document.getElementById('loginErr');
+  err.textContent='';
+  if(pass.length < 6){ err.textContent='رمز عبور باید حداقل ۶ کاراکتر باشد'; return; }
+  try{
+    showLoading(true);
+    await auth.createUserWithEmailAndPassword(email, pass);
+  }catch(e){ err.textContent = translateError(e.code); showLoading(false); }
+}
+
+function doLogout(){ if(confirm('خروج از حساب؟')) auth.signOut(); }
+
+function translateError(code){
+  const map = {
+    'auth/user-not-found':'کاربری با این ایمیل یافت نشد',
+    'auth/wrong-password':'رمز عبور اشتباه است',
+    'auth/invalid-email':'ایمیل نامعتبر است',
+    'auth/email-already-in-use':'این ایمیل قبلاً ثبت شده',
+    'auth/weak-password':'رمز عبور ضعیف است',
+    'auth/invalid-credential':'اطلاعات ورود نامعتبر است',
+    'auth/too-many-requests':'تلاش‌های زیاد. چند دقیقه صبر کنید'
+  };
+  return map[code] || 'خطا: '+code;
+}
+
+/* ================== فایربیس CRUD ================== */
+function tasksCollection(){
+  return db.collection('users').doc(currentUser.uid).collection('tasks');
+}
+
+// 🎧 Listener زنده - هر تغییری در فایربیس فوراً در UI منعکس می‌شود
+function subscribeToTasks(){
+  if(unsubscribe) unsubscribe();
+  unsubscribe = tasksCollection().orderBy('createdAt','desc').onSnapshot(
+    snap => {
+      tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderAll();
+    },
+    err => console.error('Firestore error:', err)
+  );
+}
+
+async function addTask(){
+  const title = document.getElementById('newTitle').value.trim();
+  if(!title){ document.getElementById('newTitle').focus(); return; }
+  const dl = document.getElementById('newDeadline').value;
+  const data = {
+    title,
+    category: document.getElementById('newCategory').value,
+    priority: +document.getElementById('newPriority').value,
+    createdAt: Date.now(),
+    doneAt: null,
+    status: 'active',
+    deadline: dl ? new Date(dl).getTime() : null
+  };
+  try{
+    await tasksCollection().add(data);
+    document.getElementById('newTitle').value='';
+    document.getElementById('newDeadline').value='';
+  }catch(e){ alert('خطا در ذخیره: '+e.message); }
+}
+
+async function toggleTask(id){
+  const t = tasks.find(x=>x.id===id); if(!t) return;
+  const newStatus = t.status==='done' ? 'active' : 'done';
+  try{
+    await tasksCollection().doc(id).update({
+      status: newStatus,
+      doneAt: newStatus==='done' ? Date.now() : null
+    });
+  }catch(e){ alert('خطا: '+e.message); }
+}
+
+async function deleteTask(id){
+  if(!confirm('این کار حذف شود؟')) return;
+  try{ await tasksCollection().doc(id).delete(); }
+  catch(e){ alert('خطا: '+e.message); }
+}
+
+async function clearDone(){
+  if(!confirm('همه کارهای انجام‌شده حذف شوند؟')) return;
+  const batch = db.batch();
+  tasks.filter(t=>t.status==='done').forEach(t=>{
+    batch.delete(tasksCollection().doc(t.id));
+  });
+  try{ await batch.commit(); }
+  catch(e){ alert('خطا: '+e.message); }
+}
+
+function openEdit(id){
+  const t = tasks.find(x=>x.id===id); if(!t) return;
+  editId = id;
+  document.getElementById('eTitle').value = t.title;
+  document.getElementById('ePriority').value = t.priority;
+  document.getElementById('eCategory').value = t.category;
+  document.getElementById('eDeadline').value = t.deadline ? new Date(t.deadline).toISOString().slice(0,10) : '';
+  document.getElementById('modalBack').classList.add('open');
+}
+
+async function saveEdit(){
+  const t = tasks.find(x=>x.id===editId); if(!t) return;
+  const dl = document.getElementById('eDeadline').value;
+  try{
+    await tasksCollection().doc(editId).update({
+      title: document.getElementById('eTitle').value.trim() || t.title,
+      priority: +document.getElementById('ePriority').value,
+      category: document.getElementById('eCategory').value,
+      deadline: dl ? new Date(dl).getTime() : null
+    });
+    closeModal();
+  }catch(e){ alert('خطا: '+e.message); }
+}
+function closeModal(){ document.getElementById('modalBack').classList.remove('open'); }
+
+/* ================== وضعیت‌ها ================== */
+function stats(){
+  const done = tasks.filter(t=>t.status==='done'), active = tasks.filter(t=>t.status!=='done');
+  const t0 = todayStart();
+  const overdue = active.filter(t=>t.deadline && t.deadline < t0.getTime());
+  const weekly = Array(8).fill(0);
+  const satStart = d => { const x=new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate()-((x.getDay()+1)%7)); return x; };
+  const thisSat = satStart(new Date()).getTime();
+  done.forEach(t=>{ const w = Math.floor((thisSat - satStart(new Date(t.doneAt)).getTime())/(7*D)); if(w>=0&&w<8) weekly[7-w]++; });
+  const dayCount = Array(7).fill(0);
+  done.forEach(t=>{ dayCount[(new Date(t.doneAt).getDay()+1)%7]++; });
+  let streak=0, cursor=t0.getTime();
+  const doneDays = new Set(done.map(t=>{const d=new Date(t.doneAt);d.setHours(0,0,0,0);return d.getTime();}));
+  if(!doneDays.has(cursor)) cursor-=D;
+  while(doneDays.has(cursor)){ streak++; cursor-=D; }
+  return {done, active, overdue, weekly, dayCount, streak,
+    total: tasks.length, pct: tasks.length? Math.round(done.length/tasks.length*100):0};
+}
+function regress(arr){
+  const n=arr.length, mx=(n-1)/2, my=arr.reduce((a,b)=>a+b,0)/n;
+  let num=0,den=0; arr.forEach((y,x)=>{num+=(x-mx)*(y-my);den+=(x-mx)**2;});
+  const s=den?num/den:0; return {s, fc:[1,2,3].map(k=>Math.max(0,Math.round(s*(n-1+k)+(my-s*mx))))};
+}
+
+/* ================== رندر پلنر ================== */
+function deadlineInfo(t){
+  if(t.deadline==null) return null;
+  const diff=Math.round((t.deadline-todayStart().getTime())/D);
+  if(t.status==='done') return {txt:'📅 '+faDate(t.deadline),late:false};
+  if(diff<0) return {txt:`⏰ ${faNum(Math.abs(diff))} روز عقب‌افتاده`,late:true};
+  if(diff===0) return {txt:'📅 امروز',late:false};
+  if(diff===1) return {txt:'📅 فردا',late:false};
+  return {txt:'📅 '+faNum(diff)+' روز دیگر',late:false};
+}
+
+function renderPlanner(){
+  if(!currentUser) return;
+  const s=stats();
+  document.getElementById('plannerKpis').innerHTML=[
+    {l:'کل کارها',v:faNum(s.total),c:'#6c8cff',h:'مجموع کارهای ثبت‌شده'},
+    {l:'فعال',v:faNum(s.active.length),c:'#ffb454',h:'در انتظار انجام'},
+    {l:'انجام شده',v:faNum(s.done.length),c:'#4ade80',h:'تکمیل‌شده تاکنون'},
+    {l:'عقب‌افتاده',v:faNum(s.overdue.length),c:'#ff6b81',h:'نیازمند رسیدگی فوری'},
+    {l:'پیشرفت کلی',v:faNum(s.pct)+'٪',c:'#38e1c6',h:null,bar:s.pct},
+  ].map(k=>`<div class="kpi"><div class="glow" style="background:${k.c}"></div>
+    <div class="label">${k.l}</div><div class="value">${k.v}</div>
+    ${k.bar!=null?`<div class="mini-bar"><i style="width:${k.bar}%"></i></div>`:`<div class="hint">${k.h}</div>`}</div>`).join('');
+
+  let list=[...tasks];
+  const fs=document.getElementById('fStatus').value, fp=document.getElementById('fPriority').value,
+        fc=document.getElementById('fCategory').value, so=document.getElementById('fSort').value;
+  if(fs!=='all') list=list.filter(t=>t.status===fs);
+  if(fp!=='all') list=list.filter(t=>t.priority===+fp);
+  if(fc!=='all') list=list.filter(t=>t.category===fc);
+  if(so==='newest') list.sort((a,b)=>b.createdAt-a.createdAt);
+  if(so==='priority') list.sort((a,b)=>b.priority-a.priority);
+  if(so==='deadline') list.sort((a,b)=>(a.deadline??9e15)-(b.deadline??9e15));
+
+  const el=document.getElementById('taskList');
+  if(!list.length){ el.innerHTML=`<div class="empty"><div class="big">🗒️</div>کاری یافت نشد!</div>`; return; }
+  el.innerHTML=list.map(t=>{
+    const dl=deadlineInfo(t), done=t.status==='done';
+    return `<div class="task ${done?'done':''} ${dl&&dl.late?'overdue':''}">
+      <button class="check ${done?'on':''}" onclick="toggleTask('${t.id}')">${done?'✓':''}</button>
+      <div class="t-main">
+        <div class="t-title">${t.title}</div>
+        <div class="t-meta">
+          <span class="badge">${CATS[t.category].n}</span>
+          <span class="badge p${t.priority}">اولویت ${PRIS[t.priority]}</span>
+          ${dl?`<span class="badge ${dl.late?'late':''}">${dl.txt}</span>`:''}
+        </div>
+      </div>
+      <div class="t-actions">
+        <button onclick="openEdit('${t.id}')" title="ویرایش">✏️</button>
+        <button onclick="deleteTask('${t.id}')" title="حذف">🗑️</button>
+      </div></div>`;
+  }).join('');
+}
+
+/* ================== رندر داشبورد ================== */
+let charts={};
+function destroyCharts(){Object.values(charts).forEach(c=>c.destroy());charts={};}
+
+function renderDash(){
+  if(!currentUser) return;
+  const s=stats();
+  const hasData=tasks.length>0;
+  document.getElementById('dashEmpty').classList.toggle('hidden',hasData);
+  document.getElementById('dashContent').classList.toggle('hidden',!hasData);
+  if(!hasData){destroyCharts();document.getElementById('dashKpis').innerHTML='';return;}
+
+  const avgW=s.weekly.reduce((a,b)=>a+b,0)/8;
+  document.getElementById('dashKpis').innerHTML=[
+    {l:'نرخ تکمیل هفتگی',v:faNum(avgW.toFixed(1))+' کار',c:'#6c8cff',h:'میانگین ۸ هفته اخیر'},
+    {l:'استریک فعالیت',v:faNum(s.streak)+' روز',c:'#ffb454',h:'روزهای متوالی با کار تکمیل‌شده'},
+    {l:'عقب‌افتاده',v:faNum(s.overdue.length),c:'#ff6b81',h:'تسک‌های از سررسید گذشته'},
+    {l:'پیشرفت کلی',v:faNum(s.pct)+'٪',c:'#38e1c6',h:null,bar:s.pct},
+  ].map(k=>`<div class="kpi"><div class="glow" style="background:${k.c}"></div>
+    <div class="label">${k.l}</div><div class="value">${k.v}</div>
+    ${k.bar!=null?`<div class="mini-bar"><i style="width:${k.bar}%"></i></div>`:`<div class="hint">${k.h}</div>`}</div>`).join('');
+
+  renderCharts(s); renderHeatmap(); renderGoal(s,avgW); renderInsights(s);
+}
+
+function renderCharts(s){
+  destroyCharts();
+  Chart.defaults.color=cssVar('--muted'); Chart.defaults.font.family='Vazirmatn';
+  const {s:slope,fc}=regress(s.weekly);
+  const labels=[...s.weekly.map((_,i)=>'هفته '+faNum(i+1)),...fc.map((_,i)=>'پیش‌بینی '+faNum(i+1))];
+
+  charts.trend=new Chart(document.getElementById('trendChart'),{type:'line',
+    data:{labels,datasets:[
+      {label:'انجام‌شده',data:[...s.weekly,...Array(3).fill(null)],borderColor:'#6c8cff',backgroundColor:'rgba(108,140,255,.12)',fill:true,tension:.4,pointRadius:4},
+      {label:'پیش‌بینی',data:[...Array(7).fill(null),s.weekly[7],...fc],borderColor:'#38e1c6',borderDash:[6,5],tension:.4,pointRadius:4,pointStyle:'triangle'}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{usePointStyle:true,boxWidth:8}}},
+      scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(128,128,128,.08)'}},x:{grid:{display:false}}}}});
+
+  const catCounts=Object.keys(CATS).map(c=>tasks.filter(t=>t.category===c).length);
+  charts.cat=new Chart(document.getElementById('catChart'),{type:'doughnut',
+    data:{labels:Object.values(CATS).map(x=>x.n),datasets:[{data:catCounts,
+      backgroundColor:['#6c8cff','#38e1c6','#ffb454','#b48cff'],borderColor:cssVar('--panel'),borderWidth:3,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:11}}}}}});
+
+  const priLabels=['کم','متوسط','زیاد'];
+  charts.pri=new Chart(document.getElementById('priChart'),{type:'bar',
+    data:{labels:priLabels,datasets:[
+      {label:'فعال',data:[1,2,3].map(p=>s.active.filter(t=>t.priority===p).length),backgroundColor:'#6c8cff',borderRadius:8},
+      {label:'انجام‌شده',data:[1,2,3].map(p=>s.done.filter(t=>t.priority===p).length),backgroundColor:'#38e1c6',borderRadius:8}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{usePointStyle:true,boxWidth:8}}},
+      scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(128,128,128,.08)'}},x:{grid:{display:false}}}}});
+
+  const maxD=Math.max(...s.dayCount,1);
+  charts.week=new Chart(document.getElementById('weekChart'),{type:'bar',
+    data:{labels:DAY_NAMES,datasets:[{data:s.dayCount,
+      backgroundColor:s.dayCount.map(v=>v===maxD&&v>0?'#38e1c6':'#2b3a6b'),borderRadius:8,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(128,128,128,.08)'}},x:{grid:{display:false}}}}});
+}
+
+function renderHeatmap(){
+  const colors=[cssVar('--hm0'),cssVar('--hm1'),cssVar('--hm2'),cssVar('--hm3'),cssVar('--hm4')];
+  const WEEKS=13, t0=todayStart().getTime();
+  const sat=d=>{const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+1)%7));return x.getTime();};
+  const thisSat=sat(Date.now());
+  const grid={};
+  tasks.forEach(t=>{
+    [t.createdAt,t.doneAt].forEach(ts=>{ if(!ts)return;
+      const day=new Date(ts);day.setHours(0,0,0,0);
+      const w=Math.round((thisSat-day.getTime())/D);
+      if(w>=0&&w<WEEKS*7){const dow=(day.getDay()+1)%7, wk=Math.floor(w/7);
+        grid[(WEEKS-1-wk)+'-'+dow]=(grid[(WEEKS-1-wk)+'-'+dow]||0)+1;}});
+  });
+  const tip=document.getElementById('tip');
+  let html='';
+  for(let d=0;d<7;d++)for(let w=0;w<WEEKS;w++){
+    const v=grid[w+'-'+d]||0;
+    html+=`<div class="hm-cell" data-w="${w}" data-d="${d}" data-v="${v}" style="background:${v===0?colors[0]:colors[Math.min(4,v)]}"></div>`;
+  }
+  document.getElementById('heatmap').innerHTML=html;
+  document.querySelectorAll('.hm-cell').forEach(el=>{
+    el.addEventListener('mousemove',e=>{tip.style.opacity=1;tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY-30)+'px';
+      tip.textContent=`${DAY_NAMES[el.dataset.d]} • هفته ${faNum(WEEKS-el.dataset.w)} اخیر • ${faNum(el.dataset.v)} رویداد`;});
+    el.addEventListener('mouseleave',()=>tip.style.opacity=0);
+  });
+}
+
+function renderGoal(s,avgW){
+  document.getElementById('ringArc').style.strokeDashoffset=364*(1-s.pct/100);
+  let shown=0;const iv=setInterval(()=>{shown+=2;if(shown>=s.pct){shown=s.pct;clearInterval(iv);}
+    document.getElementById('ringPct').textContent=faNum(shown)+'٪';},18);
+  const weeksLeft=avgW>0?Math.ceil(s.active.length/avgW):null;
+  document.getElementById('goalInfo').innerHTML=`
+    <div class="row"><span>انجام‌شده</span><b>${faNum(s.done.length)} از ${faNum(s.total)}</b></div>
+    <div class="row"><span>باقی‌مانده</span><b>${faNum(s.active.length)} کار</b></div>
+    <div class="row"><span>نرخ هفتگی</span><b>${faNum(avgW.toFixed(1))} کار</b></div>
+    <div class="row" style="border:none"><span>تخمین اتمام</span><b style="color:${weeksLeft&&weeksLeft<=3?'var(--good)':'var(--warn)'}">${weeksLeft!=null?faNum(weeksLeft)+' هفته':'—'}</b></div>`;
+  document.getElementById('goalInsight').innerHTML = s.pct>=70?
+    `<div class="insight" style="border-right-color:var(--good)"><div class="icon">🏆</div><div class="body"><b>عملکرد عالی</b><p>با همین ریتم، به‌زودی تمام کارها تکمیل می‌شوند.</p></div></div>`:
+    `<div class="insight" style="border-right-color:var(--warn)"><div class="icon">⚠️</div><div class="body"><b>جای رشد وجود دارد</b><p>برای رسیدن به ۱۰۰٪، روزانه حداقل یک کار کوچک را تکمیل کنید.</p></div></div>`;
+}
+
+function renderInsights(s){
+  const ins=[], w=s.weekly;
+  const recent=w[6]+w[7], prev=w[4]+w[5];
+  if(recent>prev) ins.push({icon:'📈',tag:'good',tagText:'روند صعودی',title:'شتاب تکمیل بالا رفته',
+    text:`در ۲ هفته اخیر ${faNum(recent)} کار تمام شده در برابر ${faNum(prev)} کار دوره قبل.`});
+  else if(recent<prev) ins.push({icon:'📉',tag:'bad',tagText:'هشدار افت',title:'ریتم تکمیل کند شده',
+    text:`تکمیل کارها از ${faNum(prev)} به ${faNum(recent)} در ۲ هفته رسیده. پیشنهاد: امروز فقط روی یک کار کوچک تمرکز کنید.`});
+  else ins.push({icon:'➡️',tag:'info',tagText:'وضعیت باثبات',title:'ریتم ثابت',
+    text:'خروجی شما پایدار است. برای رشد، هر هفته یک کار چالشی اضافه کنید.'});
+
+  if(s.overdue.length) ins.push({icon:'🚨',tag:'bad',tagText:'فوری',title:`${faNum(s.overdue.length)} کار عقب‌افتاده`,
+    text:`«${s.overdue[0].title}» ${faNum(Math.round((todayStart()-s.overdue[0].deadline)/D))} روز از سررسیدش گذشته.`});
+  else ins.push({icon:'✅',tag:'good',tagText:'پایداری',title:'هیچ کار عقب‌افتاده‌ای ندارید',
+    text:'تمام سررسیدها تحت کنترل است.'});
+
+  const best=s.dayCount.indexOf(Math.max(...s.dayCount));
+  if(Math.max(...s.dayCount)>0) ins.push({icon:'📅',tag:'info',tagText:'الگوی هفتگی',title:`بهترین روز شما: ${DAY_NAMES[best]}`,
+    text:`بیشترین تکمیل کارها در ${DAY_NAMES[best]} اتفاق افتاده.`});
+
+  ins.push({icon:'🔥',tag:s.streak>=3?'good':'warn',tagText:'استریک',title:`${faNum(s.streak)} روز فعالیت متوالی`,
+    text:s.streak>=3?`زنجیره ${faNum(s.streak)} روزه‌تان را حفظ کنید!`:'یک کار کوچک امروز انجام دهید.'});
+
+  document.getElementById('insightList').innerHTML=ins.map(i=>`
+    <div class="insight"><div class="icon">${i.icon}</div>
+      <div><b>${i.title}<span class="tag ${i.tag}">${i.tagText}</span></b><p>${i.text}</p></div></div>`).join('');
+}
+
+/* ================== ناوبری و تم ================== */
+function switchView(v){
+  document.getElementById('plannerView').classList.toggle('hidden',v!=='planner');
+  document.getElementById('dashView').classList.toggle('hidden',v!=='dash');
+  document.getElementById('tabPlanner').classList.toggle('active',v==='planner');
+  document.getElementById('tabDash').classList.toggle('active',v==='dash');
+  if(v==='dash') renderDash();
+}
+function toggleTheme(){
+  const r=document.documentElement;
+  r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';
+  localStorage.setItem('sp_theme',r.dataset.theme);
+  if(!document.getElementById('dashView').classList.contains('hidden')) renderDash();
+}
+function renderAll(){ renderPlanner(); if(!document.getElementById('dashView').classList.contains('hidden')) renderDash(); }
+
+/* ================== وضعیت آنلاین/آفلاین ================== */
+window.addEventListener('online', ()=>{
+  document.getElementById('syncBadge').className='sync-badge';
+  document.getElementById('syncBadge').innerHTML='<span class="live-dot" style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block"></span> آنلاین';
+});
+window.addEventListener('offline', ()=>{
+  document.getElementById('syncBadge').className='sync-badge offline';
+  document.getElementById('syncBadge').innerHTML='<span class="live-dot" style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block"></span> آفلاین';
+});
+
+/* ================== شروع ================== */
+const savedTheme=localStorage.getItem('sp_theme');
+if(savedTheme){document.documentElement.dataset.theme=savedTheme;}
+</script>
+</body>
+</html>
